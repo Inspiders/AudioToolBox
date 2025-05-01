@@ -1,7 +1,6 @@
 import React from 'react';
-import AudioRecorder from './components/audiorecorder/AudioRecorder.jsx';
-import './global.scss'; // Verifique se o caminho está correto
-
+import AudioRecorder from './components/audiorecorder/Audiorecorder.jsx';
+import './index.css';
 
 const App = () => {
   return (
