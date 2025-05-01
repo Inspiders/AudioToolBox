@@ -78,13 +78,4 @@ Projeto criado por Adelino Manuel - Inspiders, com o apoio de Sky4 HH
 📝 Licença
 Este projeto está licenciado sob a licença MIT.
 
-
-
 ---
-
-
-
-
-
-
-
