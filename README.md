@@ -34,9 +34,6 @@ Ideal para produtores musicais, criadores de conteúdo, dubladores e entusiastas
 
 my-electron-app/ ├── src/ │ ├── main/ # Código principal do Electron │ ├── renderer/ # Interface React │ └── preload.js # Comunicação segura entre Electron e frontend ├── .erb/ # Configurações da Electron React Boilerplate ├── node_modules/ ├── package.json ├── README.md └── ...
 
-yaml
-Copiar
-Editar
 
 ---
 
@@ -49,9 +46,7 @@ git clone https://github.com/inspiders/audio-toolbox.git
 cd audio-toolbox
 📦 Instale as dependências:
 
-bash
-Copiar
-Editar
+```bash
 npm install
 🚀 Inicie a aplicação em modo de desenvolvimento:
 
@@ -78,15 +73,6 @@ Projeto criado por Adelino Manuel - Inspiders, com o apoio de Sky4 HH
 
 📝 Licença
 Este projeto está licenciado sob a licença MIT.
-
-yaml
-Copiar
-Editar
-
----
-
-Se quiser, posso criar uma logo visual estilizada com o nome *AudioToolBox* para adicionar ao início do README. Deseja isso agora?
-
 
 
 
