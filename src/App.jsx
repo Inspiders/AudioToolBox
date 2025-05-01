@@ -1,14 +1,13 @@
 import React from 'react';
-import AudioRecorder from './components/audiorecorder/Audiorecorder.jsx';
-import './index.css';
+import AudioRecorder from './components/audiorecorder/Audiorecorder';
 
-const App = () => {
+function App() {
   return (
-    <div>
-      <h1>Aplicativo de Áudio</h1>
-      <AudioRecorder />
+    <div className="audio">
+      <h1>AudioToolBox</h1>
+      <AudioRecorder /> {/* <-- Aqui está o que faltava */}
     </div>
   );
-};
+}
 
 export default App;

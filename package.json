@@ -15,6 +15,7 @@
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.10",
     "bpm-detective": "^2.0.5",
+    "lucide-react": "^0.503.0",
     "music-metadata": "^8.3.0",
     "pitchfinder": "^2.3.2",
     "react": "^19.0.0",
