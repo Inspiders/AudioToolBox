@@ -1,492 +1,512 @@
-import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Mic, MicOff, Save, Music, Bookmark, FastForward, Rewind } from 'lucide-react';
-import './Audiorecorder.scss';
+import React, { useState, useEffect, useRef } from 'react';
+import { Play, Pause, Square, RefreshCcw, Save, Volume2 } from 'lucide-react';
+import './AudioRecorder.scss';
+const { ipcRenderer } = window.require('electron');
 
-// Componente principal do gravador de áudio
 const AudioRecorder = () => {
-  // Estados para gerenciar a gravação e reprodução
+  // Estados para controlar o gravador
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [audioURL, setAudioURL] = useState('');
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioUrl, setAudioUrl] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [pitch, setPitch] = useState(1);
-  const [markers, setMarkers] = useState([]);
-  const [metadata, setMetadata] = useState({ title: '', author: '', vibe: '' });
-  const [showMetadataModal, setShowMetadataModal] = useState(false);
-  const [audioLevel, setAudioLevel] = useState(0);
-  const [frequencyData, setFrequencyData] = useState(new Uint8Array(128).fill(0));
+  const [visualizationType, setVisualizationType] = useState('waveform'); // waveform ou frequency
+  const [selectedFormat, setSelectedFormat] = useState('wav');
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [fileName, setFileName] = useState('recording');
 
-  // Referências para manipulação de áudio
+  // Refs para elementos e objetos
+  const canvasRef = useRef(null);
+  const audioRef = useRef(null);
   const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
-  const audioRef = useRef(null);
   const animationFrameRef = useRef(null);
+  const chunksRef = useRef([]);
   const timerRef = useRef(null);
-  const sourceRef = useRef(null);
 
-  // Inicialização do contexto de áudio
+  // Inicializar o analisador de áudio e visualização
   useEffect(() => {
-    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-    analyserRef.current = audioContextRef.current.createAnalyser();
-    analyserRef.current.fftSize = 256;
-
-    // Atalhos de teclado
-    const handleKeyDown = (e) => {
-      if (e.key === ' ' || e.code === 'Space') {
-        e.preventDefault();
-        if (audioURL) togglePlayback();
-        else toggleRecording();
-      } else if (e.key === 'm' || e.key === 'M') {
-        addMarker();
-      } else if (e.key === 'p' || e.key === 'P') {
-        if (audioURL) togglePlayback();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      cancelAnimationFrame(animationFrameRef.current);
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (audioContextRef.current) audioContextRef.current.close();
-    };
-  }, [audioURL, isRecording, isPlaying]);
-
-  // Conectar áudio ao analisador quando a URL mudar
-  useEffect(() => {
-    if (audioURL && audioRef.current) {
-      audioRef.current.onplay = () => {
-        if (!sourceRef.current) {
-          sourceRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
-          sourceRef.current.connect(analyserRef.current);
-          analyserRef.current.connect(audioContextRef.current.destination);
+    const initAudio = async () => {
+      try {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        
+        // Configurar analisador
+        analyserRef.current.fftSize = 2048;
+        analyserRef.current.smoothingTimeConstant = 0.8;
+        
+        if (!isRecording && !audioUrl) {
+          drawEmptyCanvas();
         }
-        visualize();
-      };
-    }
-  }, [audioURL]);
-
-  // Função para visualizar espectro de áudio
-  const visualize = () => {
-    if (!analyserRef.current) return;
-
-    const bufferLength = analyserRef.current.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    const updateVisualizer = () => {
-      if (!isPlaying && !isRecording) {
-        cancelAnimationFrame(animationFrameRef.current);
-        setFrequencyData(new Uint8Array(bufferLength).fill(0));
-        setAudioLevel(0);
-        return;
+      } catch (error) {
+        console.error('Erro ao inicializar áudio:', error);
       }
-
-      analyserRef.current.getByteFrequencyData(dataArray);
-      setFrequencyData(dataArray);
-
-      const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
-      setAudioLevel(average / 255);
-
-      animationFrameRef.current = requestAnimationFrame(updateVisualizer);
     };
 
-    animationFrameRef.current = requestAnimationFrame(updateVisualizer);
+    initAudio();
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  // Desenhar canvas vazio quando não há áudio
+  const drawEmptyCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#1e1e2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Linha de base
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height / 2);
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.strokeStyle = '#6c7086';
+    ctx.lineWidth = 1;
+    ctx.stroke();
   };
 
-  // Iniciar gravação
+  // Iniciar a gravação
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      audioChunksRef.current = [];
-
+      
+      // Conectar stream ao analisador para visualização
       const source = audioContextRef.current.createMediaStreamSource(stream);
       source.connect(analyserRef.current);
-      visualize();
-
+      
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      chunksRef.current = [];
+      
       mediaRecorderRef.current.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
       };
-
+      
       mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        const url = URL.createObjectURL(audioBlob);
-        setAudioURL(url);
-        saveToLocalStorage(audioBlob);
+        const blob = new Blob(chunksRef.current, { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        setAudioBlob(blob);
+        setAudioUrl(url);
+        
+        // Limpar timer quando gravação parar
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
       };
-
-      mediaRecorderRef.current.start(1000); // Dividir em blocos de 1 segundo
-      timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
-
+      
+      // Iniciar visualização
+      visualizeAudio();
+      
+      // Iniciar gravação
+      mediaRecorderRef.current.start(10);
       setIsRecording(true);
       setIsPaused(false);
+      
+      // Iniciar contagem de tempo
+      startTimer();
     } catch (error) {
-      console.error('Erro ao acessar o microfone:', error);
-      alert('Não foi possível acessar o microfone. Verifique as permissões.');
+      console.error('Erro ao iniciar gravação:', error);
     }
+  };
+
+  // Iniciar timer para duração da gravação
+  const startTimer = () => {
+    setRecordingDuration(0);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    
+    const startTime = Date.now();
+    timerRef.current = setInterval(() => {
+      const elapsedTime = Date.now() - startTime;
+      setRecordingDuration(Math.floor(elapsedTime / 1000));
+    }, 1000);
   };
 
   // Pausar gravação
   const pauseRecording = () => {
-    if (mediaRecorderRef.current && isRecording && !isPaused) {
-      mediaRecorderRef.current.pause();
-      clearInterval(timerRef.current);
-      setIsPaused(true);
-    }
-  };
-
-  // Retomar gravação
-  const resumeRecording = () => {
-    if (mediaRecorderRef.current && isRecording && isPaused) {
-      mediaRecorderRef.current.resume();
-      timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
-      setIsPaused(false);
+    if (mediaRecorderRef.current && isRecording) {
+      if (isPaused) {
+        mediaRecorderRef.current.resume();
+        setIsPaused(false);
+      } else {
+        mediaRecorderRef.current.pause();
+        setIsPaused(true);
+      }
     }
   };
 
   // Parar gravação
   const stopRecording = () => {
-    if (mediaRecorderRef.current) {
+    if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
-      clearInterval(timerRef.current);
       setIsRecording(false);
-      setIsPaused(false);
-      analyserRef.current.disconnect();
-    }
-  };
-
-  // Controle de reprodução
-  const togglePlayback = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-        setIsPlaying(false);
+      
+      // Parar as faixas do MediaStream
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      
+      // Limpar timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      
+      // Parar visualização
+      if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
-      } else {
-        audioRef.current.play().catch((err) => console.error('Erro ao reproduzir:', err));
-        setIsPlaying(true);
       }
     }
   };
 
-  const updatePlaybackRate = (rate) => {
-    const newRate = Math.max(0.5, Math.min(2, rate));
-    setPlaybackRate(newRate);
-    if (audioRef.current) audioRef.current.playbackRate = newRate;
+  // Resetar gravação
+  const resetRecording = () => {
+    stopRecording();
+    setAudioBlob(null);
+    setAudioUrl('');
+    setRecordingDuration(0);
+    
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    
+    setIsPlaying(false);
+    drawEmptyCanvas();
   };
 
-  const updatePitch = (newPitch) => {
-    const newPitchValue = Math.max(0.5, Math.min(2, newPitch));
-    setPitch(newPitchValue);
-    if (audioRef.current && sourceRef.current) {
-      // Simplificação: ajustar playbackRate para simular pitch
-      audioRef.current.playbackRate = newPitchValue * playbackRate;
+  // Reproduzir áudio gravado
+  const playRecording = () => {
+    if (audioRef.current && audioUrl) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.play();
+        setIsPlaying(true);
+        visualizeRecordedAudio();
+      }
     }
   };
 
-  // Adicionar marcador
-  const addMarker = () => {
-    if (isRecording || isPlaying) {
-      const currentTime = isRecording ? recordingTime : audioRef.current.currentTime;
-      setMarkers((prev) => [
-        ...prev,
-        {
-          time: currentTime,
-          label: `Beat ${prev.length + 1}`,
-          id: Date.now(),
-        },
-      ]);
+  // Preparar para salvar
+  const prepareToSave = () => {
+    if (audioBlob) {
+      setShowSaveModal(true);
     }
   };
 
-  // Exportar áudio
-  const handleExport = () => {
-    setShowMetadataModal(true);
+  // Salvar gravação
+  const saveRecording = () => {
+    if (audioBlob) {
+      // Solicitar electron para salvar o arquivo
+      const reader = new FileReader();
+      reader.readAsArrayBuffer(audioBlob);
+      reader.onloadend = () => {
+        const buffer = reader.result;
+        
+        ipcRenderer.send('save-audio', {
+          buffer: buffer,
+          format: selectedFormat,
+          fileName: fileName || 'recording'
+        });
+      };
+      
+      setShowSaveModal(false);
+    }
   };
 
-  const exportAudio = () => {
-    if (!audioURL) return;
-
-    const link = document.createElement('a');
-    link.href = audioURL;
-    link.download = `${metadata.title || 'audiorecorder'}.wav`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setShowMetadataModal(false);
+  // Visualizar áudio durante gravação
+  const visualizeAudio = () => {
+    if (!analyserRef.current || !canvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    
+    // Limpar canvas
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#1e1e2e';
+    ctx.fillRect(0, 0, width, height);
+    
+    // Escolher tipo de visualização
+    if (visualizationType === 'waveform') {
+      // Visualização de forma de onda
+      const bufferLength = analyserRef.current.fftSize;
+      const dataArray = new Uint8Array(bufferLength);
+      analyserRef.current.getByteTimeDomainData(dataArray);
+      
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = isPaused ? '#f9e2af' : '#f38ba8';
+      ctx.beginPath();
+      
+      const sliceWidth = width / bufferLength;
+      let x = 0;
+      
+      for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = v * height / 2;
+        
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+        
+        x += sliceWidth;
+      }
+      
+      ctx.stroke();
+    } else {
+      // Visualização de frequência (FFT)
+      const bufferLength = analyserRef.current.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyserRef.current.getByteFrequencyData(dataArray);
+      
+      const barWidth = width / bufferLength * 2.5;
+      let x = 0;
+      
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = dataArray[i] / 255 * height;
+        
+        // Gradiente baseado na frequência
+        const hue = i / bufferLength * 360;
+        ctx.fillStyle = isPaused ? '#f9e2af' : `hsl(${hue}, 100%, 50%)`;
+        
+        ctx.fillRect(x, height - barHeight, barWidth, barHeight);
+        x += barWidth + 1;
+        
+        if (x > width) break;
+      }
+    }
+    
+    // Continuar animação se estiver gravando
+    if (isRecording) {
+      animationFrameRef.current = requestAnimationFrame(visualizeAudio);
+    }
   };
 
-  // Salvar no localStorage
-  const saveToLocalStorage = (blob) => {
-    localStorage.setItem('audiorecorderTimestamp', Date.now().toString());
-    localStorage.setItem('audiorecorderDuration', recordingTime.toString());
-    localStorage.setItem('audiorecorderMarkers', JSON.stringify(markers));
+  // Visualizar áudio durante reprodução
+  const visualizeRecordedAudio = async () => {
+    if (!audioRef.current || !audioContextRef.current || !analyserRef.current) return;
+    
+    // Criar source do elemento de áudio e conectar ao analisador
+    const source = audioContextRef.current.createMediaElementSource(audioRef.current);
+    source.connect(analyserRef.current);
+    analyserRef.current.connect(audioContextRef.current.destination);
+    
+    const updateVisualizer = () => {
+      visualizeAudio();
+      
+      if (audioRef.current && !audioRef.current.paused) {
+        animationFrameRef.current = requestAnimationFrame(updateVisualizer);
+      } else {
+        setIsPlaying(false);
+        cancelAnimationFrame(animationFrameRef.current);
+        drawEmptyCanvas();
+      }
+    };
+    
+    updateVisualizer();
   };
 
-  // Formatar tempo
-  const formatTime = (seconds) => {
+  // Formatar tempo de duração
+  const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
+    const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Handler para evento de fim de reprodução
+  const handleAudioEnded = () => {
+    setIsPlaying(false);
+  };
+
   return (
-    <div className="audio">
-      <div className="recorder-container">
-        <h1 className="app-title">AudioRecorder</h1>
-
-        {/* Visualizador de espectro */}
-        <div className="spectrum-visualizer">
-          <div className="frequency-bars">
-            {Array.from({ length: 32 }).map((_, i) => {
-              const index = Math.floor(i * frequencyData.length / 32);
-              const height = frequencyData[index] / 255;
-              return (
-                <div
-                  key={i}
-                  className="frequency-bar"
-                  style={{ height: `${height * 100}%` }}
-                />
-              );
-            })}
-          </div>
-          {markers.map((marker) => {
-            const position = (marker.time / (recordingTime || audioRef.current?.duration || 1)) * 100;
-            return (
-              <div
-                key={marker.id}
-                className="marker-indicator"
-                style={{ left: `${position}%` }}
-              />
-            );
-          })}
-        </div>
-
-        {/* Medidor de nível */}
-        <div className="level-meter">
-          <div
-            className="level-fill"
-            style={{ width: `${audioLevel * 100}%` }}
-          />
-        </div>
-
-        {/* Controles de gravação */}
-        <div className="record-controls">
-          {!audioURL ? (
-            <>
-              <button
-                onClick={startRecording}
-                disabled={isRecording && !isPaused}
-                className={`record-button ${isRecording && !isPaused ? 'recording' : ''}`}
-              >
-                <Mic size={24} />
-                Iniciar
-              </button>
-              {isRecording && (
-                <>
-                  <button
-                    onClick={pauseRecording}
-                    disabled={isPaused}
-                    className="record-button"
-                  >
-                    <Pause size={24} />
-                    Pausar
-                  </button>
-                  <button
-                    onClick={resumeRecording}
-                    disabled={!isPaused}
-                    className="record-button"
-                  >
-                    <Play size={24} />
-                    Continuar
-                  </button>
-                  <button
-                    onClick={stopRecording}
-                    className="record-button"
-                  >
-                    <MicOff size={24} />
-                    Parar
-                  </button>
-                </>
-              )}
-            </>
-          ) : (
-            <div className="playback-controls">
-              <button
-                onClick={() => updatePlaybackRate(playbackRate - 0.1)}
-                className="speed-button"
-              >
-                <Rewind size={20} />
-              </button>
-              <button
-                onClick={togglePlayback}
-                className="play-button"
-              >
-                {isPlaying ? <Pause size={24} /> : <Play size={24} />}
-              </button>
-              <button
-                onClick={() => updatePlaybackRate(playbackRate + 0.1)}
-                className="speed-button"
-              >
-                <FastForward size={20} />
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Informações */}
-        <div className="info-grid">
-          <div className="info-box">
-            <div className="info-label">Duração</div>
-            <div className="info-value time-value">
-              {formatTime(isPlaying && audioRef.current ? audioRef.current.currentTime : recordingTime)}
-            </div>
-          </div>
-          <div className="info-box">
-            <div className="info-label">Marcadores</div>
-            <div className="info-value markers-value">{markers.length}</div>
-          </div>
-        </div>
-
-        {/* Botões de ação */}
-        <div className="action-buttons">
-          <button
-            onClick={addMarker}
-            disabled={!isRecording && !isPlaying}
-            className={`action-button mark-button ${!isRecording && !isPlaying ? 'disabled' : ''}`}
+    <div className="audio-recorder">
+      <h1> AudioToolBox </h1>
+      
+      <div className="visualization-container">
+        <canvas ref={canvasRef} width={800} height={200}></canvas>
+        
+        <div className="visualization-controls">
+          <button 
+            className={`visualization-btn ${visualizationType === 'waveform' ? 'active' : ''}`} 
+            onClick={() => setVisualizationType('waveform')}
           >
-            <Bookmark size={18} className="button-icon" />
-            Adicionar Marcador
+            Forma de Onda
           </button>
-          <button
-            onClick={handleExport}
-            disabled={!audioURL}
-            className={`action-button export-button ${!audioURL ? 'disabled' : ''}`}
+          <button 
+            className={`visualization-btn ${visualizationType === 'frequency' ? 'active' : ''}`} 
+            onClick={() => setVisualizationType('frequency')}
           >
-            <Save size={18} className="button-icon" />
-            Exportar Áudio
+            Espectro de Frequência
           </button>
         </div>
-
-        {/* Controles de áudio */}
-        {audioURL && (
-          <div className="audio-settings">
-            <audio ref={audioRef} src={audioURL} className="hidden-audio" />
-            <div className="slider-grid">
-              <div className="slider-container">
-                <label className="slider-label">Velocidade: {playbackRate.toFixed(1)}x</label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2"
-                  step="0.1"
-                  value={playbackRate}
-                  onChange={(e) => updatePlaybackRate(parseFloat(e.target.value))}
-                  className="slider-control"
-                />
-              </div>
-              <div className="slider-container">
-                <label className="slider-label">Pitch: {pitch.toFixed(1)}</label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2"
-                  step="0.1"
-                  value={pitch}
-                  onChange={(e) => updatePitch(parseFloat(e.target.value))}
-                  className="slider-control"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Lista de marcadores */}
-        {markers.length > 0 && (
-          <div className="markers-container">
-            <h3 className="section-title">Marcadores</h3>
-            <div className="markers-list">
-              {markers.map((marker) => (
-                <div key={marker.id} className="marker-item">
-                  <span className="marker-label">{marker.label}</span>
-                  <span className="marker-time">{formatTime(marker.time)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
-
-      {/* Modal de metadados */}
-      {showMetadataModal && (
-        <div className="modal-overlay">
+      
+      <div className="duration-display">
+        {formatDuration(recordingDuration)}
+      </div>
+      
+      <div className="controls">
+        <button 
+          className={`control-btn start ${isRecording && !isPaused ? 'active' : ''}`} 
+          onClick={startRecording} 
+          disabled={isRecording}
+        >
+          <Play size={24} />
+          <span>Iniciar</span>
+        </button>
+        
+        <button 
+          className={`control-btn pause ${isPaused ? 'active' : ''}`} 
+          onClick={pauseRecording} 
+          disabled={!isRecording}
+        >
+          <Pause size={24} />
+          <span>Pausar</span>
+        </button>
+        
+        <button 
+          className="control-btn stop" 
+          onClick={stopRecording} 
+          disabled={!isRecording}
+        >
+          <Square size={24} />
+          <span>Parar</span>
+        </button>
+        
+        <button 
+          className={`control-btn play ${isPlaying ? 'active' : ''}`} 
+          onClick={playRecording} 
+          disabled={!audioUrl}
+        >
+          <Volume2 size={24} />
+          <span>Ouvir</span>
+        </button>
+        
+        <button 
+          className="control-btn reset" 
+          onClick={resetRecording}
+        >
+          <RefreshCcw size={24} />
+          <span>Regravar</span>
+        </button>
+        
+        <button 
+          className="control-btn save" 
+          onClick={prepareToSave} 
+          disabled={!audioBlob}
+        >
+          <Save size={24} />
+          <span>Salvar</span>
+        </button>
+      </div>
+      
+      {/* Player de áudio invisível para reprodução */}
+      <audio 
+        ref={audioRef} 
+        src={audioUrl} 
+        onEnded={handleAudioEnded}
+        style={{ display: 'none' }} 
+      />
+      
+      {/* Modal para salvar */}
+      {showSaveModal && (
+        <div className="save-modal">
           <div className="modal-content">
-            <h2 className="modal-title">Metadados do Áudio</h2>
-            <div className="modal-fields">
-              <div className="form-group">
-                <label className="form-label">Título</label>
-                <input
-                  type="text"
-                  value={metadata.title}
-                  onChange={(e) => setMetadata({ ...metadata, title: e.target.value })}
-                  className="form-input"
-                  placeholder="Nome do áudio"
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Autor</label>
-                <input
-                  type="text"
-                  value={metadata.author}
-                  onChange={(e) => setMetadata({ ...metadata, author: e.target.value })}
-                  className="form-input"
-                  placeholder="Nome do artista"
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Vibe</label>
-                <input
-                  type="text"
-                  value={metadata.vibe}
-                  onChange={(e) => setMetadata({ ...metadata, vibe: e.target.value })}
-                  className="form-input"
-                  placeholder="Ex.: Chill, Energético, Escuro"
-                />
-              </div>
+            <h3>Salvar Gravação</h3>
+            
+            <div className="input-group">
+              <label htmlFor="fileName">Nome do arquivo:</label>
+              <input 
+                type="text" 
+                id="fileName" 
+                value={fileName} 
+                onChange={(e) => setFileName(e.target.value)} 
+              />
             </div>
+            
+            <div className="format-selector">
+              <div className="format-label">Formato:</div>
+              <div className="format-options">
+                <label className="format-option">
+                  <input 
+                    type="radio" 
+                    name="format" 
+                    value="wav" 
+                    checked={selectedFormat === 'wav'} 
+                    onChange={() => setSelectedFormat('wav')} 
+                  />
+                  <span>WAV</span>
+                </label>
+                
+                <label className="format-option">
+                  <input 
+                    type="radio" 
+                    name="format" 
+                    value="mp3" 
+                    checked={selectedFormat === 'mp3'} 
+                    onChange={() => setSelectedFormat('mp3')} 
+                  />
+                  <span>MP3</span>
+                </label>
+                
+                <label className="format-option disabled">
+                  <input 
+                    type="radio" 
+                    name="format" 
+                    value="midi" 
+                    disabled 
+                  />
+                  <span>MIDI</span>
+                </label>
+              </div>
+              
+              {selectedFormat === 'midi' && (
+                <div className="format-info">
+                  MIDI não é um formato de gravação de áudio, mas sim de dados musicais digitais.
+                </div>
+              )}
+            </div>
+            
             <div className="modal-actions">
-              <button
-                onClick={() => setShowMetadataModal(false)}
-                className="cancel-button"
+              <button 
+                className="modal-btn cancel" 
+                onClick={() => setShowSaveModal(false)}
               >
                 Cancelar
               </button>
-              <button
-                onClick={exportAudio}
-                className="confirm-button"
+              <button 
+                className="modal-btn save" 
+                onClick={saveRecording}
               >
-                <Music size={18} className="button-icon" />
-                Exportar
+                Salvar
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Atalhos de teclado */}
-      <div className="keyboard-shortcuts">
-        Atalhos: <span className="shortcut-key">Espaço</span> (Gravar/Play),{' '}
-        <span className="shortcut-key">M</span> (Marcador),{' '}
-        <span className="shortcut-key">P</span> (Play/Pause)
+      
+      {/* Info sobre MIDI */}
+      <div className="midi-info">
+        <p>
+          <strong>Nota:</strong> MIDI não é um formato de gravação de áudio, 
+          mas sim um protocolo de dados musicais digitais que armazena informações sobre notas, 
+          duração, volume, etc., não o som real capturado pelo microfone.
+        </p>
       </div>
     </div>
   );

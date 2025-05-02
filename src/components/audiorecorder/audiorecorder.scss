@@ -1,753 +1,395 @@
-@import url('https://fonts.googleapis.com/css2?family=Audiowide&family=Orbitron:wght@400;600;800&display=swap');
-
 // Variáveis
-$dark-bg: #0a0a0f;
-$card-bg: #131318;
-$neon-purple: #b026ff;
-$neon-blue: #4d74ff;
-$neon-cyan: #0dfcf4;
-$text-primary: #ffffff;
-$text-secondary: #b0b0cc;
-$glow-shadow: 0 0 8px rgba(176, 38, 255, 0.3); // Reduzido para neon suave
-$glow-shadow-blue: 0 0 8px rgba(77, 116, 255, 0.3); // Reduzido para neon suave
+$background-color: #1e1e2e;
+$text-color: #cdd6f4;
+$primary-color: #74c7ec;
+$secondary-color: #a6e3a1;
+$accent-color: #f38ba8;
+$warning-color: #f9e2af;
+$border-radius: 8px;
+$box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+$transition-speed: 0.3s;
 
-// Mixins
-@mixin neon-glow($color, $intensity: 0.3) { // Intensidade reduzida
-  box-shadow: 0 0 5px rgba($color, $intensity),
-              0 0 10px rgba($color, $intensity * 0.7),
-              0 0 15px rgba($color, $intensity * 0.4);
-}
-
-@mixin neon-text-glow($color, $intensity: 0.5) { // Intensidade reduzida
-  text-shadow: 0 0 5px rgba($color, $intensity),
-               0 0 10px rgba($color, $intensity * 0.7);
-}
-
-@mixin gradient-bg {
-  background: linear-gradient(135deg, rgba($card-bg, 0.9), rgba(darken($card-bg, 5%), 0.9));
-}
-
-@mixin button-hover {
-  transform: translateY(-2px);
-  transition: all 0.3s ease;
-  filter: brightness(1.1); // Efeito de hover suavizado
-}
-
-// Estilos Base
-body {
+// Reset e estilos base
+* {
   margin: 0;
   padding: 0;
-  font-family: 'Orbitron', sans-serif;
-  background-color: $dark-bg;
-  color: $text-primary;
+  box-sizing: border-box;
 }
 
-// Aplicação principal
-.audio {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: radial-gradient(ellipse at bottom, #1f1356 0%, #090a0f 80%);
-  padding: 1.5rem; // Reduzido para evitar espaçamento excessivo
-  position: relative;
-  overflow: hidden;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(45deg, rgba($neon-purple, 0.05), rgba($neon-blue, 0.05));
-    z-index: -1;
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px; // Suavizado
-    background: linear-gradient(to right, transparent, $neon-purple, $neon-blue, transparent);
-    opacity: 0.4;
-    z-index: 1;
-  }
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: $background-color;
+  color: $text-color;
 }
 
 // Container principal
-.recorder-container {
-  width: 100%;
-  max-width: 700px; // Reduzido para melhor alinhamento
-  @include gradient-bg;
-  border-radius: 16px;
-  padding: 1.5rem;
-  position: relative;
-  border: 1px solid rgba($neon-purple, 0.2);
-  @include neon-glow($neon-purple, 0.1); // Neon suavizado
+.audio-recorder {
   display: flex;
   flex-direction: column;
   align-items: center;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: -2px;
-    left: -2px;
-    right: -2px;
-    bottom: -2px;
-    background: linear-gradient(45deg, $neon-purple, $neon-blue);
-    border-radius: 18px;
-    z-index: -1;
-    opacity: 0.08;
-    filter: blur(4px);
-  }
-}
-
-// Título da aplicação
-.app-title {
-  font-family: 'Audiowide', cursive;
-  font-size: 2rem; // Reduzido para melhor proporção
-  font-weight: 800;
-  text-align: center;
-  margin-bottom: 1.5rem;
-  background: linear-gradient(to right, $neon-purple, $neon-blue, $neon-cyan);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  @include neon-text-glow($neon-blue, 0.5); // Neon suavizado
-  letter-spacing: 1px;
-  
-  &::after {
-    content: '';
-    display: block;
-    width: 50%;
-    height: 2px;
-    margin: 0.5rem auto 0;
-    background: linear-gradient(to right, transparent, $neon-purple, $neon-blue, transparent);
-    border-radius: 50%;
-    opacity: 0.4;
-  }
-}
-
-// Visualizador de espectro
-.spectrum-visualizer {
+  padding: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+  height: 100vh;
   width: 100%;
-  height: 100px; // Reduzido para melhor proporção
-  background-color: rgba(darken($card-bg, 5%), 0.8);
-  border-radius: 10px;
-  margin-bottom: 1rem;
+  
+  h1 {
+    font-size: 2.2rem;
+    margin-bottom: 2rem;
+    text-align: center;
+    color: $primary-color;
+    font-weight: 600;
+  }
+}
+
+// Container de visualização
+.visualization-container {
+  width: 100%;
+  margin-bottom: 1.5rem;
+  border-radius: $border-radius;
   overflow: hidden;
+  background-color: rgba(darken($background-color, 5%), 0.5);
+  box-shadow: $box-shadow;
   position: relative;
-  border: 1px solid rgba($neon-purple, 0.2);
   
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(to right, transparent, $neon-blue, transparent);
-    opacity: 0.4;
-  }
-  
-  .frequency-bars {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-around;
-    height: 100%;
-    padding: 0 4px;
-    box-sizing: border-box;
-    
-    .frequency-bar {
-      width: 6px; // Reduzido para melhor espaçamento
-      background: linear-gradient(to top, $neon-blue, $neon-purple);
-      border-radius: 3px 3px 0 0;
-      transition: height 0.1s ease;
-      @include neon-glow($neon-purple, 0.2); // Neon suavizado
-      min-height: 2px;
-      
-      &:nth-child(odd) {
-        background: linear-gradient(to top, $neon-blue, $neon-cyan);
-      }
-    }
-  }
-  
-  .marker-indicator {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background-color: rgba($neon-purple, 0.7);
-    @include neon-glow($neon-purple, 0.3); // Neon suavizado
-    z-index: 2;
+  canvas {
+    width: 100%;
+    height: 200px;
+    display: block;
+    background-color: darken($background-color, 5%);
   }
 }
 
-// Medidor de nível
-.level-meter {
-  width: 100%;
-  height: 10px;
-  background-color: rgba(darken($card-bg, 8%), 0.8);
-  border-radius: 5px;
-  margin-bottom: 1.5rem;
-  overflow: hidden;
-  border: 1px solid rgba($neon-blue, 0.2);
-  
-  .level-fill {
-    height: 100%;
-    background: linear-gradient(to right, $neon-blue, $neon-purple);
-    border-radius: 4px;
-    transition: width 0.1s ease;
-  }
-}
-
-// Controles de gravação
-.record-controls {
+// Controles de visualização
+.visualization-controls {
   display: flex;
   justify-content: center;
-  margin-bottom: 1.5rem;
+  margin-top: 0.8rem;
+  gap: 1rem;
+  padding: 0.5rem;
+  background-color: rgba(lighten($background-color, 5%), 0.5);
+  border-radius: $border-radius;
   
-  .record-button {
-    width: 56px; // Reduzido para melhor proporção
-    height: 56px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .visualization-btn {
+    background-color: lighten($background-color, 8%);
+    color: $text-color;
     border: none;
-    border-radius: 50%;
-    background: linear-gradient(135deg, $neon-purple, $neon-blue);
-    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: $border-radius;
     cursor: pointer;
-    @include neon-glow($neon-purple, 0.3); // Neon suavizado
-    transition: all 0.3s ease;
+    transition: all $transition-speed ease;
+    font-size: 0.9rem;
     
     &:hover {
-      @include button-hover;
+      background-color: lighten($background-color, 15%);
     }
     
-    &.recording {
-      background: linear-gradient(135deg, #ff3264, #ff5b4d);
-      animation: pulse 1.5s infinite;
-      @include neon-glow(#ff3264, 0.3); // Neon suavizado
-    }
-  }
-  
-  .playback-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    
-    .play-button {
-      width: 56px;
-      height: 56px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      border-radius: 50%;
-      background: linear-gradient(135deg, $neon-purple, $neon-blue);
-      color: white;
-      cursor: pointer;
-      @include neon-glow($neon-blue, 0.3); // Neon suavizado
-      transition: all 0.3s ease;
-      
-      &:hover {
-        @include button-hover;
-      }
-    }
-    
-    .speed-button {
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      border-radius: 50%;
-      background: rgba($card-bg, 0.7);
-      color: $text-primary;
-      cursor: pointer;
-      border: 1px solid rgba($neon-blue, 0.3);
-      transition: all 0.3s ease;
-      
-      &:hover {
-        @include button-hover;
-        border-color: rgba($neon-blue, 0.6);
-      }
-    }
-  }
-}
-
-// Informações e estatísticas
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.8rem;
-  margin-bottom: 1rem;
-  width: 100%;
-  
-  .info-box {
-    background-color: rgba(darken($card-bg, 3%), 0.7);
-    border-radius: 10px;
-    padding: 0.8rem;
-    border: 1px solid rgba($neon-blue, 0.2);
-    text-align: center;
-    
-    .info-label {
-      font-size: 0.7rem;
-      color: $text-secondary;
-      margin-bottom: 0.2rem;
-    }
-    
-    .info-value {
-      font-size: 1.2rem;
+    &.active {
+      background-color: $primary-color;
+      color: darken($background-color, 15%);
       font-weight: 600;
-      
-      &.time-value {
-        color: $neon-purple;
-        @include neon-text-glow($neon-purple, 0.3); // Neon suavizado
-      }
-      
-      &.markers-value {
-        color: $neon-blue;
-        @include neon-text-glow($neon-blue, 0.3); // Neon suavizado
-      }
     }
   }
 }
 
-// Botões de ação
-.action-buttons {
+// Display de duração
+.duration-display {
+  font-size: 2rem;
+  font-weight: 600;
+  margin: 1rem 0;
+  font-family: monospace;
+  color: $primary-color;
+  background-color: rgba(lighten($background-color, 5%), 0.7);
+  padding: 0.5rem 2rem;
+  border-radius: $border-radius;
+}
+
+// Container de controles
+.controls {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 0.8rem;
-  margin-bottom: 1rem;
+  gap: 1rem;
+  margin: 1rem 0;
   width: 100%;
+}
+
+// Botões de controle
+.control-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  border: none;
+  border-radius: $border-radius;
+  background-color: lighten($background-color, 8%);
+  color: $text-color;
+  cursor: pointer;
+  transition: all $transition-speed ease;
+  min-width: 100px;
+  box-shadow: $box-shadow;
   
-  .action-button {
-    display: flex;
-    align-items: center;
-    padding: 0.6rem 1rem;
-    border: none;
-    border-radius: 8px;
-    color: white;
-    cursor: pointer;
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 600;
-    transition: all 0.3s ease;
+  span {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+  }
+  
+  &:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  &.start {
+    background-color: $secondary-color;
+    color: darken($background-color, 15%);
     
-    .button-icon {
-      margin-right: 0.4rem;
+    &.active {
+      background-color: $accent-color;
+      animation: pulse 2s infinite;
     }
+  }
+  
+  &.pause {
+    background-color: lighten($background-color, 12%);
     
-    &.mark-button {
-      background: linear-gradient(135deg, $neon-purple, darken($neon-purple, 15%));
-      @include neon-glow($neon-purple, 0.2); // Neon suavizado
-      flex: 1;
-      justify-content: center;
-      
-      &:hover:not(.disabled) {
-        @include button-hover;
-      }
+    &.active {
+      background-color: $warning-color;
+      color: darken($background-color, 15%);
     }
+  }
+  
+  &.stop {
+    background-color: lighten($background-color, 16%);
     
-    &.export-button {
-      background: linear-gradient(135deg, $neon-blue, darken($neon-blue, 15%));
-      @include neon-glow($neon-blue, 0.2); // Neon suavizado
-      flex: 1;
-      justify-content: center;
-      
-      &:hover:not(.disabled) {
-        @include button-hover;
-      }
+    &:hover:not(:disabled) {
+      background-color: $accent-color;
     }
+  }
+  
+  &.play {
+    background-color: $primary-color;
+    color: darken($background-color, 15%);
     
-    &.disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-      filter: grayscale(0.7);
+    &.active {
+      animation: pulse 2s infinite;
+    }
+  }
+  
+  &.reset {
+    background-color: lighten($background-color, 10%);
+  }
+  
+  &.save {
+    background-color: $secondary-color;
+    color: darken($background-color, 15%);
+    
+    &:disabled {
+      background-color: lighten($background-color, 10%);
+      color: $text-color;
     }
   }
 }
 
-// Controles de áudio
-.audio-settings {
-  margin-bottom: 1rem;
-  width: 100%;
-  
-  .hidden-audio {
-    display: none;
-  }
-  
-  .slider-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-    
-    .slider-container {
-      .slider-label {
-        display: block;
-        font-size: 0.8rem;
-        color: $text-secondary;
-        margin-bottom: 0.4rem;
-      }
-      
-      .slider-control {
-        -webkit-appearance: none;
-        width: 100%;
-        height: 6px;
-        background: rgba(darken($card-bg, 5%), 0.8);
-        border-radius: 3px;
-        outline: none;
-        
-        &::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: $neon-purple;
-          cursor: pointer;
-          box-shadow: 0 0 6px rgba($neon-purple, 0.6); // Neon suavizado
-        }
-        
-        &::-moz-range-thumb {
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: $neon-purple;
-          cursor: pointer;
-          box-shadow: 0 0 6px rgba($neon-purple, 0.6); // Neon suavizado
-        }
-      }
-    }
-  }
-}
-
-// Lista de marcadores
-.markers-container {
-  margin-top: 1rem;
-  width: 100%;
-  
-  .section-title {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 0.6rem;
-    color: $neon-purple;
-    @include neon-text-glow($neon-purple, 0.3); // Neon suavizado
-  }
-  
-  .markers-list {
-    max-height: 120px;
-    overflow-y: auto;
-    padding-right: 0.4rem;
-    
-    &::-webkit-scrollbar {
-      width: 5px;
-    }
-    
-    &::-webkit-scrollbar-track {
-      background: rgba(darken($card-bg, 3%), 0.5);
-      border-radius: 3px;
-    }
-    
-    &::-webkit-scrollbar-thumb {
-      background: rgba($neon-purple, 0.5);
-      border-radius: 3px;
-      
-      &:hover {
-        background: rgba($neon-purple, 0.7);
-      }
-    }
-    
-    .marker-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.6rem 0.8rem;
-      margin-bottom: 0.4rem;
-      background-color: rgba(darken($card-bg, 3%), 0.7);
-      border-radius: 6px;
-      border: 1px solid rgba($neon-blue, 0.15);
-      transition: all 0.2s ease;
-      
-      &:hover {
-        border-color: rgba($neon-purple, 0.4);
-        transform: translateX(2px);
-      }
-      
-      .marker-label {
-        font-weight: 500;
-        font-size: 0.9rem;
-      }
-      
-      .marker-time {
-        color: $neon-blue;
-        font-family: 'Orbitron', sans-serif;
-        @include neon-text-glow($neon-blue, 0.2); // Neon suavizado
-        font-size: 0.9rem;
-      }
-    }
-  }
-}
-
-// Modal de metadados
-.modal-overlay {
+// Modal para salvar
+.save-modal {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(darken($dark-bg, 3%), 0.85);
+  background-color: rgba(0, 0, 0, 0.7);
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
+  z-index: 100;
+  
+  .modal-content {
+    background-color: lighten($background-color, 5%);
+    border-radius: $border-radius;
+    padding: 2rem;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: $box-shadow;
+    
+    h3 {
+      margin-bottom: 1.5rem;
+      color: $primary-color;
+      font-size: 1.5rem;
+      text-align: center;
+    }
+    
+    .input-group {
+      margin-bottom: 1.5rem;
+      
+      label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+      }
+      
+      input[type="text"] {
+        width: 100%;
+        padding: 0.8rem;
+        border-radius: $border-radius;
+        border: 1px solid lighten($background-color, 15%);
+        background-color: lighten($background-color, 2%);
+        color: $text-color;
+        font-size: 1rem;
+        
+        &:focus {
+          outline: none;
+          border-color: $primary-color;
+        }
+      }
+    }
+    
+    .format-selector {
+      margin-bottom: 2rem;
+      
+      .format-label {
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+      }
+      
+      .format-options {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        
+        .format-option {
+          padding: 0.8rem 1.2rem;
+          border-radius: $border-radius;
+          border: 1px solid lighten($background-color, 15%);
+          background-color: lighten($background-color, 2%);
+          display: flex;
+          align-items: center;
+          cursor: pointer;
+          flex: 1;
+          transition: all $transition-speed ease;
+          
+          &:hover:not(.disabled) {
+            background-color: lighten($background-color, 10%);
+          }
+          
+          input[type="radio"] {
+            margin-right: 0.5rem;
+          }
+          
+          &.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+      }
+      
+      .format-info {
+        padding: 0.8rem;
+        background-color: rgba($warning-color, 0.2);
+        border-radius: $border-radius;
+        font-size: 0.9rem;
+        color: $warning-color;
+      }
+    }
+    
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+      
+      .modal-btn {
+        padding: 0.8rem 1.5rem;
+        border-radius: $border-radius;
+        border: none;
+        cursor: pointer;
+        transition: all $transition-speed ease;
+        font-weight: 500;
+        
+        &.cancel {
+          background-color: lighten($background-color, 15%);
+          color: $text-color;
+          
+          &:hover {
+            background-color: lighten($background-color, 20%);
+          }
+        }
+        
+        &.save {
+          background-color: $secondary-color;
+          color: darken($background-color, 15%);
+          
+          &:hover {
+            background-color: lighten($secondary-color, 10%);
+          }
+        }
+      }
+    }
+  }
+}
+
+// Informações sobre MIDI
+.midi-info {
+  margin-top: 1.5rem;
   padding: 1rem;
-  z-index: 1000;
-  backdrop-filter: blur(4px);
-  animation: fadeIn 0.3s ease;
-}
-
-.modal-content {
-  width: 100%;
-  max-width: 450px; // Reduzido para melhor proporção
-  background: linear-gradient(145deg, $card-bg, darken($card-bg, 5%));
-  border-radius: 12px;
-  padding: 1.5rem;
-  position: relative;
-  border: 1px solid rgba($neon-purple, 0.2);
-  @include neon-glow($neon-purple, 0.1); // Neon suavizado
-  animation: slideUp 0.4s ease;
+  background-color: rgba(lighten($background-color, 5%), 0.5);
+  border-radius: $border-radius;
+  font-size: 0.9rem;
+  max-width: 800px;
+  border-left: 4px solid $warning-color;
   
-  &::before {
-    content: '';
-    position: absolute;
-    top: -2px;
-    left: -2px;
-    right: -2px;
-    bottom: -2px;
-    background: linear-gradient(45deg, $neon-purple, $neon-blue);
-    border-radius: 14px;
-    z-index: -1;
-    opacity: 0.08;
-    filter: blur(4px);
-  }
-}
-
-.modal-title {
-  font-size: 1.3rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  color: $neon-purple;
-  @include neon-text-glow($neon-purple, 0.3); // Neon suavizado
-  text-align: center;
-}
-
-.modal-fields {
-  margin-bottom: 1rem;
-  
-  .form-group {
-    margin-bottom: 0.8rem;
+  p {
+    line-height: 1.5;
+    color: darken($text-color, 10%);
     
-    .form-label {
-      display: block;
-      font-size: 0.8rem;
-      margin-bottom: 0.4rem;
-      color: $text-secondary;
+    strong {
+      color: $warning-color;
     }
-    
-    .form-input {
-      width: 100%;
-      padding: 0.6rem 0.8rem;
-      background-color: rgba(darken($card-bg, 5%), 0.8);
-      border: 1px solid rgba($neon-blue, 0.2);
-      border-radius: 6px;
-      color: $text-primary;
-      font-family: 'Orbitron', sans-serif;
-      font-size: 0.9rem;
-      transition: all 0.3s ease;
-      
-      &:focus {
-        outline: none;
-        border-color: rgba($neon-purple, 0.5);
-        @include neon-glow($neon-purple, 0.1); // Neon suavizado
-      }
-      
-      &::placeholder {
-        color: rgba($text-secondary, 0.5);
-      }
-    }
-  }
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.8rem;
-  
-  .cancel-button {
-    padding: 0.6rem 1.2rem;
-    background-color: rgba(darken($card-bg, 3%), 0.8);
-    border: 1px solid rgba($text-secondary, 0.3);
-    border-radius: 6px;
-    color: $text-secondary;
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    
-    &:hover {
-      background-color: rgba(darken($card-bg, 1%), 0.9);
-      border-color: rgba($text-secondary, 0.5);
-    }
-  }
-  
-  .confirm-button {
-    display: flex;
-    align-items: center;
-    padding: 0.6rem 1.2rem;
-    background: linear-gradient(135deg, $neon-blue, $neon-purple);
-    border: none;
-    border-radius: 6px;
-    color: $text-primary;
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 600;
-    cursor: pointer;
-    @include neon-glow($neon-blue, 0.2); // Neon suavizado
-    transition: all 0.3s ease;
-    
-    &:hover {
-      @include button-hover;
-    }
-    
-    .button-icon {
-      margin-right: 0.4rem;
-    }
-  }
-}
-
-// Atalhos de teclado
-.keyboard-shortcuts {
-  text-align: center;
-  margin-top: 1rem;
-  font-size: 0.7rem;
-  color: $text-secondary;
-  
-  .shortcut-key {
-    display: inline-block;
-    padding: 0.2rem 0.4rem;
-    margin: 0 0.2rem;
-    background-color: rgba($neon-purple, 0.2);
-    border-radius: 3px;
-    border: 1px solid rgba($neon-purple, 0.3);
-    color: $neon-purple;
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 500;
   }
 }
 
 // Animações
 @keyframes pulse {
   0% {
-    transform: scale(1);
-    opacity: 1;
+    box-shadow: 0 0 0 0px rgba($accent-color, 0.5);
   }
-  50% {
-    transform: scale(1.03); // Suavizado
-    opacity: 0.9;
+  70% {
+    box-shadow: 0 0 0 10px rgba($accent-color, 0);
   }
   100% {
-    transform: scale(1);
-    opacity: 1;
+    box-shadow: 0 0 0 0px rgba($accent-color, 0);
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px); // Suavizado
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-// Media queries para responsividade
+// Responsividade
 @media (max-width: 768px) {
-  .recorder-container {
+  .audio-recorder {
     padding: 1rem;
-    max-width: 90%;
   }
   
-  .app-title {
-    font-size: 1.8rem;
+  .controls {
+    gap: 0.5rem;
   }
   
-  .spectrum-visualizer {
-    height: 80px;
-  }
-  
-  .info-grid,
-  .slider-grid {
-    grid-template-columns: 1fr;
-    gap: 0.8rem;
-  }
-  
-  .action-buttons {
-    flex-direction: column;
-    align-items: center;
-    gap: 0.6rem;
-    
-    .action-button {
-      width: 100%;
-      justify-content: center;
-    }
-  }
-}
-
-@media (max-width: 480px) {
-  .recorder-container {
+  .control-btn {
+    min-width: 80px;
     padding: 0.8rem;
   }
   
-  .app-title {
-    font-size: 1.5rem;
+  .visualization-controls {
+    flex-direction: column;
+    gap: 0.5rem;
   }
   
-  .spectrum-visualizer {
-    height: 60px;
+  .save-modal .modal-content {
+    padding: 1.5rem;
     
-    .frequency-bars .frequency-bar {
-      width: 4px;
-    }
-  }
-  
-  .record-controls .playback-controls {
-    gap: 0.4rem;
-    
-    .play-button {
-      width: 48px;
-      height: 48px;
-    }
-    
-    .speed-button {
-      width: 36px;
-      height: 36px;
+    .format-options {
+      flex-direction: column;
     }
   }
 }
