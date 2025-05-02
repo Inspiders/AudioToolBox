@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Square, RefreshCcw, Save, Volume2 } from 'lucide-react';
+import { Play, Pause, Square, RefreshCcw, Save, Volume2, Sliders } from 'lucide-react';
 import './AudioRecorder.scss';
 const { ipcRenderer } = window.require('electron');
 
@@ -15,6 +15,11 @@ const AudioRecorder = () => {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [fileName, setFileName] = useState('recording');
+  // Novos estados para controle de frequência
+  const [showFrequencyControls, setShowFrequencyControls] = useState(false);
+  const [minFrequency, setMinFrequency] = useState(50);
+  const [maxFrequency, setMaxFrequency] = useState(2000);
+  const [frequencyFilterEnabled, setFrequencyFilterEnabled] = useState(false);
 
   // Refs para elementos e objetos
   const canvasRef = useRef(null);
@@ -25,6 +30,10 @@ const AudioRecorder = () => {
   const animationFrameRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
+  // Novos refs para o filtro de frequência
+  const lowPassFilterRef = useRef(null);
+  const highPassFilterRef = useRef(null);
+  const sourceNodeRef = useRef(null);
 
   // Inicializar o analisador de áudio e visualização
   useEffect(() => {
@@ -36,6 +45,15 @@ const AudioRecorder = () => {
         // Configurar analisador
         analyserRef.current.fftSize = 2048;
         analyserRef.current.smoothingTimeConstant = 0.8;
+        
+        // Inicializar filtros de frequência
+        lowPassFilterRef.current = audioContextRef.current.createBiquadFilter();
+        lowPassFilterRef.current.type = 'lowpass';
+        lowPassFilterRef.current.frequency.value = maxFrequency;
+        
+        highPassFilterRef.current = audioContextRef.current.createBiquadFilter();
+        highPassFilterRef.current.type = 'highpass';
+        highPassFilterRef.current.frequency.value = minFrequency;
         
         if (!isRecording && !audioUrl) {
           drawEmptyCanvas();
@@ -57,6 +75,14 @@ const AudioRecorder = () => {
     };
   }, []);
 
+  // Efeito para atualizar as frequências dos filtros quando mudarem
+  useEffect(() => {
+    if (lowPassFilterRef.current && highPassFilterRef.current) {
+      lowPassFilterRef.current.frequency.value = maxFrequency;
+      highPassFilterRef.current.frequency.value = minFrequency;
+    }
+  }, [minFrequency, maxFrequency]);
+
   // Desenhar canvas vazio quando não há áudio
   const drawEmptyCanvas = () => {
     const canvas = canvasRef.current;
@@ -74,6 +100,43 @@ const AudioRecorder = () => {
     ctx.strokeStyle = '#6c7086';
     ctx.lineWidth = 1;
     ctx.stroke();
+
+    // Se o filtro de frequência estiver ativado, desenhar indicadores
+    if (frequencyFilterEnabled && visualizationType === 'frequency') {
+      drawFrequencyRangeIndicators(ctx, canvas.width, canvas.height);
+    }
+  };
+
+  // Desenhar indicadores de faixa de frequência
+  const drawFrequencyRangeIndicators = (ctx, width, height) => {
+    // Calcular posições baseadas na frequência
+    // O analisador FFT geralmente cobre faixas de 0Hz até metade da taxa de amostragem (geralmente 22050Hz)
+    const totalFrequencyRange = 22050;
+    const minX = (minFrequency / totalFrequencyRange) * width;
+    const maxX = (maxFrequency / totalFrequencyRange) * width;
+    
+    // Desenhar faixa selecionada como overlay semitransparente
+    ctx.fillStyle = 'rgba(116, 199, 236, 0.2)'; // cor primary-color com transparência
+    ctx.fillRect(minX, 0, maxX - minX, height);
+    
+    // Desenhar linhas delimitadoras
+    ctx.beginPath();
+    ctx.moveTo(minX, 0);
+    ctx.lineTo(minX, height);
+    ctx.strokeStyle = '#74c7ec'; // primary-color
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(maxX, 0);
+    ctx.lineTo(maxX, height);
+    ctx.stroke();
+    
+    // Adicionar rótulos de frequência
+    ctx.fillStyle = '#cdd6f4'; // text-color
+    ctx.font = '12px sans-serif';
+    ctx.fillText(`${minFrequency}Hz`, minX + 5, 15);
+    ctx.fillText(`${maxFrequency}Hz`, maxX - 50, 15);
   };
 
   // Iniciar a gravação
@@ -82,8 +145,16 @@ const AudioRecorder = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
       // Conectar stream ao analisador para visualização
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      source.connect(analyserRef.current);
+      sourceNodeRef.current = audioContextRef.current.createMediaStreamSource(stream);
+      
+      // Configurar cadeia de áudio com filtros quando ativados
+      if (frequencyFilterEnabled) {
+        sourceNodeRef.current.connect(highPassFilterRef.current);
+        highPassFilterRef.current.connect(lowPassFilterRef.current);
+        lowPassFilterRef.current.connect(analyserRef.current);
+      } else {
+        sourceNodeRef.current.connect(analyserRef.current);
+      }
       
       mediaRecorderRef.current = new MediaRecorder(stream);
       chunksRef.current = [];
@@ -156,6 +227,11 @@ const AudioRecorder = () => {
       
       // Parar as faixas do MediaStream
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      
+      // Desconectar nós de áudio
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.disconnect();
+      }
       
       // Limpar timer
       if (timerRef.current) {
@@ -277,17 +353,41 @@ const AudioRecorder = () => {
       const barWidth = width / bufferLength * 2.5;
       let x = 0;
       
+      // Calcular limites de índice para a faixa de frequência selecionada
+      // quando o filtro estiver ativado
+      const nyquist = audioContextRef.current.sampleRate / 2;
+      const minIndex = frequencyFilterEnabled ? Math.floor(minFrequency / nyquist * bufferLength) : 0;
+      const maxIndex = frequencyFilterEnabled ? Math.ceil(maxFrequency / nyquist * bufferLength) : bufferLength;
+      
       for (let i = 0; i < bufferLength; i++) {
         const barHeight = dataArray[i] / 255 * height;
         
-        // Gradiente baseado na frequência
-        const hue = i / bufferLength * 360;
-        ctx.fillStyle = isPaused ? '#f9e2af' : `hsl(${hue}, 100%, 50%)`;
+        // Verificar se está na faixa de frequência selecionada
+        const isInSelectedRange = i >= minIndex && i <= maxIndex;
+        
+        // Definir estilo baseado na faixa de frequência e no estado de pausa
+        if (isPaused) {
+          ctx.fillStyle = '#f9e2af'; // warning-color
+        } else if (frequencyFilterEnabled) {
+          // Gradiente baseado na frequência com opacidade reduzida para frequências fora da faixa
+          const hue = i / bufferLength * 360;
+          const alpha = isInSelectedRange ? 1.0 : 0.3;
+          ctx.fillStyle = `hsla(${hue}, 100%, 50%, ${alpha})`;
+        } else {
+          // Gradiente padrão baseado na frequência
+          const hue = i / bufferLength * 360;
+          ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+        }
         
         ctx.fillRect(x, height - barHeight, barWidth, barHeight);
         x += barWidth + 1;
         
         if (x > width) break;
+      }
+      
+      // Desenhar indicadores de faixa de frequência se o filtro estiver ativo
+      if (frequencyFilterEnabled) {
+        drawFrequencyRangeIndicators(ctx, width, height);
       }
     }
     
@@ -301,10 +401,19 @@ const AudioRecorder = () => {
   const visualizeRecordedAudio = async () => {
     if (!audioRef.current || !audioContextRef.current || !analyserRef.current) return;
     
-    // Criar source do elemento de áudio e conectar ao analisador
+    // Criar source do elemento de áudio
     const source = audioContextRef.current.createMediaElementSource(audioRef.current);
-    source.connect(analyserRef.current);
-    analyserRef.current.connect(audioContextRef.current.destination);
+    
+    // Configurar cadeia de áudio com filtros quando ativados
+    if (frequencyFilterEnabled) {
+      source.connect(highPassFilterRef.current);
+      highPassFilterRef.current.connect(lowPassFilterRef.current);
+      lowPassFilterRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
+    } else {
+      source.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
+    }
     
     const updateVisualizer = () => {
       visualizeAudio();
@@ -333,6 +442,36 @@ const AudioRecorder = () => {
     setIsPlaying(false);
   };
 
+  // Alternar painel de controle de frequência
+  const toggleFrequencyControls = () => {
+    setShowFrequencyControls(!showFrequencyControls);
+  };
+
+  // Habilitar/desabilitar filtro de frequência
+  const toggleFrequencyFilter = () => {
+    setFrequencyFilterEnabled(!frequencyFilterEnabled);
+    
+    // Se estamos desabilitando o filtro e estamos gravando,
+    // precisamos reconectar os nós de áudio
+    if (isRecording && sourceNodeRef.current) {
+      sourceNodeRef.current.disconnect();
+      if (!frequencyFilterEnabled) {
+        // Ativando filtro
+        sourceNodeRef.current.connect(highPassFilterRef.current);
+        highPassFilterRef.current.connect(lowPassFilterRef.current);
+        lowPassFilterRef.current.connect(analyserRef.current);
+      } else {
+        // Desativando filtro
+        sourceNodeRef.current.connect(analyserRef.current);
+      }
+    }
+    
+    // Redesenhar visualização
+    if (!isRecording && !isPlaying) {
+      drawEmptyCanvas();
+    }
+  };
+
   return (
     <div className="audio-recorder">
       <h1> AudioToolBox </h1>
@@ -353,7 +492,53 @@ const AudioRecorder = () => {
           >
             Espectro de Frequência
           </button>
+          <button 
+            className={`visualization-btn ${showFrequencyControls ? 'active' : ''}`} 
+            onClick={toggleFrequencyControls}
+          >
+            <Sliders size={16} />
+            <span>Filtro de Frequência</span>
+          </button>
         </div>
+        
+        {showFrequencyControls && (
+          <div className="frequency-controls">
+            <div className="frequency-filter-toggle">
+              <label>
+                <input 
+                  type="checkbox" 
+                  checked={frequencyFilterEnabled} 
+                  onChange={toggleFrequencyFilter} 
+                />
+                <span>Ativar filtro de frequência (50Hz-2000Hz)</span>
+              </label>
+            </div>
+            
+            <div className="frequency-sliders">
+              <div className="frequency-slider">
+                <label>Frequência mínima: {minFrequency} Hz</label>
+                <input 
+                  type="range" 
+                  min="20" 
+                  max="1000" 
+                  value={minFrequency} 
+                  onChange={(e) => setMinFrequency(parseInt(e.target.value))} 
+                />
+              </div>
+              
+              <div className="frequency-slider">
+                <label>Frequência máxima: {maxFrequency} Hz</label>
+                <input 
+                  type="range" 
+                  min="1000" 
+                  max="20000" 
+                  value={maxFrequency} 
+                  onChange={(e) => setMaxFrequency(parseInt(e.target.value))} 
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       <div className="duration-display">
